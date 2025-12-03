@@ -1,6 +1,9 @@
-import { FileSystem, Path } from "@effect/platform";
-import { NodeContext, NodeRuntime } from "@effect/platform-node";
-import { Effect, Function, Schema, Sink, Stream, Tuple } from "effect";
+import { NodeRuntime, NodeServices } from "@effect/platform-node";
+import { Effect, Function } from "effect";
+import { Tuple } from "effect/data";
+import { FileSystem, Path } from "effect/platform";
+import { Schema } from "effect/schema";
+import { Sink, Stream } from "effect/stream";
 
 const Input = Effect.gen(function* () {
     const path = yield* Path.Path;
@@ -10,10 +13,10 @@ const Input = Effect.gen(function* () {
     return fs.stream(file);
 }).pipe(Stream.unwrap);
 
-export const Line = Schema.TemplateLiteralParser(Schema.Literal("L", "R"), Schema.NumberFromString);
+export const Line = Schema.TemplateLiteralParser([Schema.Literals(["L", "R"]), Schema.NumberFromString]);
 
 export const Folder = Sink.fold<readonly [head: number, count: number], readonly ["L" | "R", number]>(
-    [50, 0] as readonly [head: number, count: number],
+    () => [50, 0] as readonly [head: number, count: number],
     Function.constTrue,
     ([head, count], [direction, movement]) => {
         if (movement === 0) {
@@ -40,7 +43,7 @@ export const Folder = Sink.fold<readonly [head: number, count: number], readonly
 Input.pipe(
     Stream.decodeText(),
     Stream.splitLines,
-    Stream.mapEffect(Schema.decodeUnknown(Line)),
+    Stream.mapEffect((line) => Schema.decodeUnknownEffect(Line)(line)),
     Stream.run(Folder),
     Effect.tap(
         Effect.fnUntraced(function* ([head, count]) {
@@ -48,6 +51,6 @@ Input.pipe(
             yield* Effect.log(`With a count of: ${count}`);
         })
     ),
-    Effect.provide(NodeContext.layer),
+    Effect.provide(NodeServices.layer),
     NodeRuntime.runMain
 );

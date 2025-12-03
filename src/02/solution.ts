@@ -1,8 +1,11 @@
 import * as assert from "node:assert/strict";
 
-import { FileSystem, Path } from "@effect/platform";
-import { NodeContext, NodeRuntime } from "@effect/platform-node";
-import { Effect, ParseResult, Schema, Stream, Tuple } from "effect";
+import { NodeRuntime, NodeServices } from "@effect/platform-node";
+import { Effect } from "effect";
+import { Filter } from "effect/data";
+import { FileSystem, Path } from "effect/platform";
+import { Schema } from "effect/schema";
+import { Stream } from "effect/stream";
 
 const Input = Effect.gen(function* () {
     const path = yield* Path.Path;
@@ -13,28 +16,13 @@ const Input = Effect.gen(function* () {
     return data.split(",");
 });
 
-export class ProjectIdRange extends Schema.transformOrFail(
-    Schema.TemplateLiteralParser(Schema.NumberFromString, Schema.Literal("-"), Schema.NumberFromString),
-    Schema.Tuple(Schema.Number, Schema.Number),
-    {
-        encode: ([start, end]) => ParseResult.succeed([start, "-", end] as const),
-        decode: ([start, _, end], _options, ast) => {
-            if (start <= end) {
-                return ParseResult.succeed([start, end] as const);
-            } else {
-                return ParseResult.fail(
-                    new ParseResult.Type(
-                        ast,
-                        Tuple.make(start, end),
-                        `Start of range must be less than or equal to end`
-                    )
-                );
-            }
-        },
-    }
-) {}
+export const ProjectIdRange = Schema.TemplateLiteralParser([
+    Schema.NumberFromString,
+    Schema.Literal("-"),
+    Schema.NumberFromString,
+]);
 
-export const IsInvalidProjectIdNaive = (number: number): boolean => {
+export const IsInvalidProjectIdNaive = Filter.make((number: number) => {
     const str = String(number);
     const numDigits = str.split("").length;
 
@@ -48,14 +36,14 @@ export const IsInvalidProjectIdNaive = (number: number): boolean => {
         const subject = str.substring(0, jump).repeat(numDigits / jump);
         assert.ok(subject.length === str.length, "lengths should equal");
 
-        if (subject === str) return true;
+        if (subject === str) return number;
         else jump = jump - 1;
     }
 
-    return false;
-};
+    return Filter.failVoid;
+});
 
-export const IsInvalidProjectId = (number: number): boolean => {
+export const IsInvalidProjectId = Filter.make((number: number) => {
     const str = String(number);
     const digits = str.split("").map(Number);
 
@@ -82,21 +70,21 @@ export const IsInvalidProjectId = (number: number): boolean => {
         }
 
         if (i === jump && j - jump + 1 === digits.length) {
-            return true;
+            return number;
         }
 
         jump = jump - 1;
     }
 
-    return false;
-};
+    return Filter.failVoid;
+});
 
 Stream.fromIterableEffect(Input).pipe(
-    Stream.mapEffect(Schema.decodeUnknown(ProjectIdRange)),
-    Stream.flatMap(([startInclusive, endInclusive]) => Stream.range(startInclusive, endInclusive)),
+    Stream.mapEffect((range) => Schema.decodeUnknownEffect(ProjectIdRange)(range)),
+    Stream.flatMap(([startInclusive, _, endInclusive]) => Stream.range(startInclusive, endInclusive)),
     Stream.filter(IsInvalidProjectId),
     Stream.runSum,
     Effect.tap((count) => Effect.log(`Total from bad project ids: ${count}`)),
-    Effect.provide(NodeContext.layer),
+    Effect.provide(NodeServices.layer),
     NodeRuntime.runMain
 );
