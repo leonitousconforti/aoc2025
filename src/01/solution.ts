@@ -11,7 +11,10 @@ const Input = Effect.gen(function* () {
     const url = new URL("input.txt", import.meta.url);
     const file = yield* path.fromFileUrl(url);
     return fs.stream(file);
-}).pipe(Stream.unwrap);
+})
+    .pipe(Stream.unwrap)
+    .pipe(Stream.decodeText())
+    .pipe(Stream.splitLines);
 
 export const Line = Schema.TemplateLiteralParser([Schema.Literals(["L", "R"]), Schema.NumberFromString]);
 
@@ -41,8 +44,6 @@ export const Folder = Sink.fold<readonly [head: number, count: number], readonly
 );
 
 Input.pipe(
-    Stream.decodeText(),
-    Stream.splitLines,
     Stream.mapEffect((line) => Schema.decodeUnknownEffect(Line)(line)),
     Stream.run(Folder),
     Effect.tap(
