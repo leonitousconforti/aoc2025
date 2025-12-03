@@ -1,0 +1,22 @@
+{
+  "name": "aoc2025",
+  "version": "0.0.0",
+  "type": "module",
+  "private": true,
+  "packageManager": "pnpm@10.24.0",
+  "scripts": {
+    "dev": "node --experimental-strip-types"
+  },
+  "dependencies": {
+    "@effect/platform-node": "https://pkg.pr.new/Effect-TS/effect-smol/@effect/platform-node@8bf52d4",
+    "effect": "https://pkg.pr.new/Effect-TS/effect-smol/effect@8bf52d4"
+  },
+  "devDependencies": {
+    "@effect/language-service": "^0.58.0",
+    "@types/node": "^24.10.1",
+    "prettier": "^3.7.3",
+    "prettier-plugin-jsdoc": "^1.7.0",
+    "prettier-plugin-packagejson": "^2.5.20",
+    "typescript": "^5.9.3"
+  }
+}
